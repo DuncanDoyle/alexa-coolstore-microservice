@@ -1,5 +1,8 @@
 package com.redhat.coolstore.alexa;
 
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,9 +15,13 @@ import com.amazon.speech.speechlet.SessionStartedRequest;
 import com.amazon.speech.speechlet.Speechlet;
 import com.amazon.speech.speechlet.SpeechletException;
 import com.amazon.speech.speechlet.SpeechletResponse;
+import com.amazon.speech.ui.OutputSpeech;
 import com.amazon.speech.ui.PlainTextOutputSpeech;
 import com.amazon.speech.ui.Reprompt;
 import com.amazon.speech.ui.SimpleCard;
+import com.redhat.coolstore.api_gateway.model.ShoppingCart;
+import com.redhat.coolstore.client.rest.CoolstoreCartServiceClient;
+import com.redhat.coolstore.util.Environment;
 
 
 /**
@@ -23,9 +30,17 @@ import com.amazon.speech.ui.SimpleCard;
  * @author <a href="mailto:duncan.doyle@redhat.com">Duncan Doyle</a>
  *
  */
+@ApplicationScoped
 public class AlexaCoolstoreSpeechlet implements Speechlet {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(AlexaCoolstoreSpeechlet.class);
+	
+	@Inject
+	private Environment environment;
+	
+	@Inject
+	private CoolstoreCartServiceClient cartServiceClient;
+	
 
 	@Override
 	public void onSessionStarted(SessionStartedRequest request, Session session) throws SpeechletException {
@@ -74,6 +89,7 @@ public class AlexaCoolstoreSpeechlet implements Speechlet {
 	 * @return SpeechletResponse spoken and visual response for the given intent
 	 */
 	private SpeechletResponse getWelcomeResponse() {
+		
 		String speechText = "Welcome to the Alexa Red Hat Coolstore demo. You can say: what's in my cart";
 
 		// Create the Simple card content.
@@ -120,6 +136,7 @@ public class AlexaCoolstoreSpeechlet implements Speechlet {
 	 * @return SpeechletResponse spoken and visual response for the given intent
 	 */
 	private SpeechletResponse getShoppingCartResponse() {
+		LOGGER.debug("Building ShoppingCart response.");
 		String speechText = "Your shopping cart is empty.";
 
 		// Create the Simple card content.
@@ -127,12 +144,17 @@ public class AlexaCoolstoreSpeechlet implements Speechlet {
 		card.setTitle("Empty shopping cart.");
 		card.setContent(speechText);
 
+		//Get the shoppingCart. The ID is fixed and set to 1 (until we can somehow links someone's Alexa account to a given ID of the cart).
+		ShoppingCart shoppingCart = cartServiceClient.getShoppingCart(environment.getCartId());
+		
 		// Create the plain text output.
-		PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
-		speech.setText(speechText);
-
-		return SpeechletResponse.newTellResponse(speech, card);
+		OutputSpeech outputSpeech = new ShoppingCartOutputSpeechFactory(shoppingCart).getOutputSpeech();
+		
+		return SpeechletResponse.newTellResponse(outputSpeech, card);
 	}
+	
+	
+	
 
 	/**
 	 * Creates a {@code SpeechletResponse} for the help intent.
